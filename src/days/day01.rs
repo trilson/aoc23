@@ -1,10 +1,4 @@
-use crate::{Solution, SolutionPair};
-
-use std::{
-    fs::File,
-    io::{prelude::*, BufReader},
-    path::Path,
-};
+use crate::{utils::files::lines_from_file, Solution, SolutionPair};
 
 pub fn solve() -> SolutionPair {
     let lines = lines_from_file("input/day01.txt");
@@ -61,12 +55,4 @@ fn get_digit_from_str(input_str: &str, nums: &Vec<&str>, with_text: bool) -> Opt
         }
     }
     None
-}
-
-fn lines_from_file(filename: impl AsRef<Path>) -> Vec<String> {
-    let file = File::open(filename).expect("no such file");
-    let buf = BufReader::new(file);
-    buf.lines()
-        .map(|l| l.expect("Could not parse line"))
-        .collect()
 }
