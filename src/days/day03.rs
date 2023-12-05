@@ -4,7 +4,6 @@ use crate::{utils::files::lines_from_file, Solution, SolutionPair};
 
 #[derive(Debug, PartialEq, Clone)]
 enum PointType {
-    Dot,
     Symbol,
     Number,
     Star,
@@ -25,17 +24,12 @@ pub fn solve() -> SolutionPair {
     let max_x = lines[0].len() as i16;
 
     let points = generate_points(&lines, max_x, max_y);
-    let res = sum_engine_parts(points, &lines, max_x, max_y);
+    let res = sum_engine_parts(points, &lines);
 
     (Solution::from(res.0), Solution::from(res.1))
 }
 
-fn sum_engine_parts(
-    points: Vec<Vec<Option<Point>>>,
-    lines: &Vec<String>,
-    max_x: i16,
-    max_y: i16,
-) -> (u32, u32) {
+fn sum_engine_parts(points: Vec<Vec<Option<Point>>>, lines: &Vec<String>) -> (u32, u32) {
     let mut seen: HashSet<(u16, u16)> = HashSet::new();
     let mut part_number_sum = 0;
     let mut gear_mult = 0;
@@ -44,42 +38,23 @@ fn sum_engine_parts(
         for element in line {
             if let Some(el) = element {
                 if el.point_type == PointType::Symbol || el.point_type == PointType::Star {
-                    let mut last_two = Vec::new();
-                    if let Some(num) = extract_number(&mut seen, &points, el, lines, -1, -1, max_x, max_y) {
-                        part_number_sum += num;
-                        last_two.push(num);
+                    let mut point_vals = Vec::new();
+                    for offset in [
+                        (-1, -1), (-1, 0), (-1, 1),
+                        ( 0, -1), /* .. */ ( 0, 1),
+                        ( 1, -1), ( 1, 0), ( 1, 1),
+                    ] {
+                        let val = extract_number(
+                            &mut seen, &points, el, lines, offset.0, offset.1
+                        );
+                        if let Some(num) = val {
+                            point_vals.push(num);
+                        }
                     }
-                    if let Some(num) = extract_number(&mut seen, &points, el, lines, -1, 0, max_x, max_y) {
-                        part_number_sum += num;
-                        last_two.push(num);
+                    if el.point_type == PointType::Star && point_vals.len() == 2 {
+                        gear_mult += point_vals[0] * point_vals[1];
                     }
-                    if let Some(num) = extract_number(&mut seen, &points, el, lines, -1, 1, max_x, max_y) {
-                        part_number_sum += num;
-                        last_two.push(num);
-                    }
-                    if let Some(num) = extract_number(&mut seen, &points, el, lines, 0, 1, max_x, max_y) {
-                        part_number_sum += num;
-                        last_two.push(num);
-                    }
-                    if let Some(num) = extract_number(&mut seen, &points, el, lines, 1, 1, max_x, max_y) {
-                        part_number_sum += num;
-                        last_two.push(num);
-                    }
-                    if let Some(num) = extract_number(&mut seen, &points, el, lines, 1, 0, max_x, max_y) {
-                        part_number_sum += num;
-                        last_two.push(num);
-                    }
-                    if let Some(num) = extract_number(&mut seen, &points, el, lines, 1, -1, max_x, max_y) {
-                        part_number_sum += num;
-                        last_two.push(num);
-                    }
-                    if let Some(num) = extract_number(&mut seen, &points, el, lines, 0, -1, max_x, max_y) {
-                        part_number_sum += num;
-                        last_two.push(num);
-                    }
-                    if last_two.len() == 2 {
-                        gear_mult += last_two[0] * last_two[1];
-                    }
+                    part_number_sum += point_vals.iter().sum::<u32>();
                 }
             }
         }
@@ -93,16 +68,11 @@ fn extract_number(
     el: &Point,
     lines: &Vec<String>,
     y_offset: i16,
-    x_offset: i16,
-    max_x: i16,
-    max_y: i16,
+    x_offset: i16
 ) -> Option<u32> {
     let x_co = el.x as i16 + x_offset;
     let y_co = el.y as i16 + y_offset;
 
-    if x_co > max_x || x_co < 0 || y_co > max_y || y_co < 0 {
-        return None;
-    }
     if let Some(point) = &points[x_co as usize][y_co as usize] {
         if point.point_type == PointType::Number && !seen.contains(&(point.x, point.y)) {
             let number_str = lines[y_co as usize].get(point.x as usize..point.x_to as usize);
@@ -139,14 +109,7 @@ fn generate_points(lines: &Vec<String>, max_x: i16, max_y: i16) -> Vec<Vec<Optio
                     }
                     current_idx = None;
                 }
-                if line_char.eq_ignore_ascii_case(&'.') {
-                    points[j][i] = Some(Point {
-                        x: j as u16,
-                        x_to: j as u16,
-                        y: i as u16,
-                        point_type: PointType::Dot,
-                    });
-                } else {
+                if !line_char.eq_ignore_ascii_case(&'.') {
                     let pt = if line_char == '*' {
                         PointType::Star
                     } else {
