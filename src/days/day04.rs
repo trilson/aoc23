@@ -4,7 +4,7 @@ use crate::{utils::files::lines_from_file, Solution, SolutionPair};
 
 pub fn solve() -> SolutionPair {
     let lines = lines_from_file("input/day04.txt");
-    let intersections = intersections(&lines);
+    let intersections: Vec<HashSet<&str>> = intersections(&lines);
     let sol1 = solve_part1(&intersections);
     let sol2 = solve_part2(&intersections);
 
