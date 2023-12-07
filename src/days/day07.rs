@@ -13,8 +13,8 @@ struct Hand {
 pub fn solve() -> SolutionPair {
     let lines = lines_from_file("input/day07.txt");
     (
-        Solution::from(solve_part(&lines, card_rank_pt1(), false)),
-        Solution::from(solve_part(&lines, card_rank_pt2(), true)),
+        Solution::from(solve_part(&lines, card_rank("AKQJT98765432"), false)),
+        Solution::from(solve_part(&lines, card_rank("AKQT98765432J"), true)),
     )
 }
 
@@ -55,82 +55,42 @@ fn compare_hands(
         .unwrap_or(Ordering::Equal);
 }
 
-fn card_rank_pt1() -> HashMap<char, usize> {
-    [
-        ('A', 1),
-        ('K', 2),
-        ('Q', 3),
-        ('J', 4),
-        ('T', 5),
-        ('9', 6),
-        ('8', 7),
-        ('7', 8),
-        ('6', 9),
-        ('5', 10),
-        ('4', 11),
-        ('3', 12),
-        ('2', 13),
-    ]
-    .iter()
-    .cloned()
-    .collect()
-}
-
-fn card_rank_pt2() -> HashMap<char, usize> {
-    [
-        ('A', 1),
-        ('K', 2),
-        ('Q', 3),
-        ('T', 4),
-        ('9', 5),
-        ('8', 6),
-        ('7', 7),
-        ('6', 8),
-        ('5', 9),
-        ('4', 10),
-        ('3', 11),
-        ('2', 12),
-        ('J', 13),
-    ]
-    .iter()
-    .cloned()
-    .collect()
+fn card_rank(order: &str) -> HashMap<char, usize> {
+    order.chars().zip(1..=13).collect()
 }
 
 fn hand_type(hand: &Hand, j_wildcard: bool) -> u8 {
     let mut card_count = HashMap::new();
+    let mut max_key = '&';
+    let mut max_non_j = 0;
     for card in hand.cards.chars() {
-        *card_count.entry(card).or_insert(0) += 1;
+        let new_count = card_count
+            .entry(card)
+            .and_modify(|count| *count += 1)
+            .or_insert(1);
+        if card != 'J' && *new_count > max_non_j {
+            max_key = card;
+            max_non_j = *new_count
+        }
     }
 
     if j_wildcard {
-        reassign_j(&mut card_count);
+        reassign_j(&mut card_count, &max_key);
     }
 
     assign_type(&card_count)
 }
 
-fn reassign_j(card_count: &mut HashMap<char, i32>) {
+fn reassign_j(card_count: &mut HashMap<char, i32>, target_char: &char) {
     if let Some(&j_value) = card_count.get(&'J') {
         if j_value == 5 {
             return;
         }
-
-        if let Some(target_char) = find_max_by_value_except_j(card_count) {
-            if let Some(target) = card_count.get_mut(&target_char) {
-                *target += j_value;
-            }
-            card_count.remove(&'J');
+        if let Some(target) = card_count.get_mut(&target_char) {
+            *target += j_value;
         }
+        card_count.remove(&'J');
     }
-}
-
-fn find_max_by_value_except_j(card_count: &HashMap<char, i32>) -> Option<char> {
-    card_count
-        .iter()
-        .filter(|&(k, _v)| *k != 'J')
-        .max_by(|a, b| a.1.cmp(&b.1))
-        .map(|(k, _v)| *k)
 }
 
 fn assign_type(card_count: &HashMap<char, i32>) -> u8 {
