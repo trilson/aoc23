@@ -9,31 +9,22 @@ pub fn solve() -> SolutionPair {
             .split_whitespace()
             .filter_map(|n| n.parse::<i32>().ok())
             .collect();
-
-        let head_tail = calculate_next(&nums);
-        sum_head += head_tail.0;
-        sum_tail += head_tail.1;
+        let sol = calculate_recursive(&nums);
+        sum_head += sol.0;
+        sum_tail += sol.1;
     }
 
     (Solution::from(sum_tail), Solution::from(sum_head))
 }
 
-fn calculate_next(nums: &Vec<i32>) -> (i32, i32) {
-    let mut current_seq = nums.to_vec();
-    let mut tail_el = 0_i32;
-    let mut heads: Vec<i32> = Vec::new();
-    while !current_seq.iter().all(|n| n == &0) {
-        if let Some(&tail) = current_seq.last() {
-            tail_el += tail;
-        }
-        if let Some(&head) = current_seq.first() {
-            heads.push(head);
-        }
-        current_seq = current_seq.windows(2).map(|w| w[1] - w[0]).collect();
+fn calculate_recursive(nums: &Vec<i32>) -> (i32, i32) {
+    if nums.len() == 0 {
+        return (0, 0);
     }
-    let mut head_el = 0;
-    while let Some(head) = heads.pop() {
-        head_el = head - head_el;
-    }
-    (head_el, tail_el)
+
+    let p1 = calculate_recursive(&nums.windows(2).map(|w| w[1] - w[0]).collect());
+    return (
+        nums.first().unwrap_or(&0) - p1.0,
+        nums.last().unwrap_or(&0) + p1.1,
+    );
 }
