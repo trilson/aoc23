@@ -15,7 +15,12 @@ pub fn solve() -> SolutionPair {
 
     // let sol1 = solve_part1(&step_map, &lines[0]);
     let sol1 = calculate(&step_map, &lines[0], |a| a == "AAA", |b| b == "ZZZ");
-    let sol2 = calculate(&step_map, &lines[0], |a| a.ends_with("A"), |b| b.ends_with("Z"));
+    let sol2 = calculate(
+        &step_map,
+        &lines[0],
+        |a| a.ends_with("A"),
+        |b| b.ends_with("Z"),
+    );
 
     (Solution::from(sol1), Solution::from(sol2))
 }
