@@ -18,7 +18,7 @@ pub fn solve() -> SolutionPair {
 }
 
 fn calculate_recursive(nums: &Vec<i32>) -> (i32, i32) {
-    if nums.len() == 0 {
+    if nums.iter().all(|a| a == &0) {
         return (0, 0);
     }
 
