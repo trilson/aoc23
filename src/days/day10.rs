@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use crate::{utils::files::lines_from_file, Solution, SolutionPair};
 
 #[derive(Debug)]
@@ -36,10 +38,15 @@ pub fn solve() -> SolutionPair {
     let lines = lines_from_file("input/day10.txt");
     let (grid, start) = parse_grid(&lines);
 
+    let mut main_loop = HashSet::new();
     let mut previous = start;
     let mut current = get_pipe_start(&grid, (start.0, start.1));
+    // This should be much much cleaner...
+    main_loop.insert(previous);
+    main_loop.insert(current);
 
     let mut steps = 0;
+
     while current != start {
         if let Some(pipe) = get_pipe_element(&grid, current) {
             let (x_offset, y_offset) =
@@ -51,14 +58,29 @@ pub fn solve() -> SolutionPair {
 
             previous = current;
             current = (x_offset + current.0, y_offset + current.1);
+            main_loop.insert(current);
             steps += 1;
         }
     }
-    let sol1: u64 = (steps + 1) / 2;
-    let sol2: u64 = 0;
 
-    // Next... double grid resolution and perform a flood-fill. Count the remainder
-    (Solution::from(sol1), Solution::from(sol2))
+    let mut captured_points = 0;
+    for (idx, line) in lines.iter().enumerate() {
+        let mut pipe_count = 0;
+        for (idx2, ch) in line.chars().enumerate() {
+            let coord = (idx2 as i32, idx as i32);
+            if main_loop.contains(&coord) && ['L', '|', 'J', 'S'].contains(&ch) {
+                pipe_count += 1;
+            }
+            if !main_loop.contains(&coord) && pipe_count % 2 != 0 {
+                captured_points += 1;
+            }
+        }
+    }
+
+    (
+        Solution::from((steps + 1) / 2),
+        Solution::from(captured_points),
+    )
 }
 
 fn get_pipe_element(grid: &Vec<Vec<Option<PipeSection>>>, x_y: (i32, i32)) -> &Option<PipeSection> {
@@ -75,17 +97,18 @@ fn get_pipe_start(grid: &Vec<Vec<Option<PipeSection>>>, start: (i32, i32)) -> (i
     for tile in [(0, -1), (-1, 0), (1, 0), (0, 1)] {
         let x_try = start.0 + tile.0;
         let y_try = start.1 + tile.1;
+
         if x_try < 0 || y_try < 0 {
             continue;
         }
-        if let Some(x) = grid.get(x_try as usize) {
-            if let Some(section) = x.get(y_try as usize) {
-                if let Some(pipe) = section {
-                    if pipe.x_from == tile.0 as i32 || pipe.y_from == tile.1 as i32 {
-                        return (x_try, y_try);
-                    }
-                }
-            }
+
+        let result = grid.get(x_try as usize)
+            .and_then(|x_vec| x_vec.get(y_try as usize))
+            .and_then(|section| section.as_ref())
+            .filter(|pipe| pipe.x_from == tile.0 as i32 || pipe.y_from == tile.1 as i32);
+
+        if result.is_some() {
+            return (x_try, y_try);
         }
     }
     (0, 0)
