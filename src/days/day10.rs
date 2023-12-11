@@ -68,7 +68,7 @@ pub fn solve() -> SolutionPair {
         let mut pipe_count = 0;
         for (idx2, ch) in line.chars().enumerate() {
             let coord = (idx2 as i32, idx as i32);
-            if main_loop.contains(&coord) && ['L', '|', 'J', 'S'].contains(&ch) {
+            if main_loop.contains(&coord) && ['7', '|', 'J', 'S'].contains(&ch) {
                 pipe_count += 1;
             }
             if !main_loop.contains(&coord) && pipe_count % 2 != 0 {
