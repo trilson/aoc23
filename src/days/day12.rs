@@ -22,13 +22,13 @@ fn solve_recursive(lines: &Vec<String>, multiple: usize) -> i64 {
             .filter_map(|s| s.parse::<i32>().ok())
             .collect();
 
-        let mut memo: HashMap<(String, Vec<i32>), i64> = HashMap::new();
+        let mut memo: HashMap<(String, i32), i64> = HashMap::new();
         sol += count(&springs, &contiguous_parts, &mut memo);
     }
     sol
 }
 
-fn count(line: &str, parts: &[i32], memo: &mut HashMap<(String, Vec<i32>), i64>) -> i64 {
+fn count(line: &str, parts: &[i32], memo: &mut HashMap<(String, i32), i64>) -> i64 {
     if line.is_empty() {
         return if parts.is_empty() { 1 } else { 0 };
     }
@@ -37,7 +37,7 @@ fn count(line: &str, parts: &[i32], memo: &mut HashMap<(String, Vec<i32>), i64>)
         return if line.contains('#') { 0 } else { 1 };
     }
 
-    let memo_key = (line.to_string(), parts.to_vec());
+    let memo_key = (line.to_string(), parts.len() as i32);
     if let Some(&cached_result) = memo.get(&memo_key) {
         return cached_result;
     }
