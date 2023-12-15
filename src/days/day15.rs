@@ -51,10 +51,5 @@ fn solve_pt2(line: &String) -> u32 {
 }
 
 fn hash(input: &str) -> i32 {
-    input.as_bytes().iter().fold(0_i32, |acc, ch| {
-        let mut hash = acc + *ch as i32;
-        hash *= 17;
-        hash = hash % 256;
-        hash
-    })
+    input.as_bytes().iter().fold(0_i32, |acc, &ch| (acc + ch as i32) * 17 % 256)
 }
