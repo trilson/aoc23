@@ -1,6 +1,7 @@
 use std::{
+    cmp::min,
     collections::{hash_map::DefaultHasher, HashMap},
-    hash::{Hash, Hasher}, cmp::min,
+    hash::{Hash, Hasher},
 };
 
 use crate::{utils::files::lines_from_file, Solution, SolutionPair};
@@ -12,21 +13,20 @@ pub fn solve() -> SolutionPair {
     (Solution::from(sol1), Solution::from(sol2))
 }
 
-fn solve_pt1(start_grid: &Vec<String>) -> i32 {
-    let (weight, _tilted) = tilt_grid(&start_grid);
+fn solve_pt1(start_grid: &[String]) -> i32 {
+    let (weight, _tilted) = tilt_grid(start_grid);
     weight
 }
 
-fn solve_pt2(start_grid: &Vec<String>, target: i64) -> i32 {
-    let mut grid = start_grid.clone();
+fn solve_pt2(start_grid: &[String], target: i64) -> i32 {
+    let mut grid = start_grid.to_vec();
     let mut rot: i64 = 0;
     let mut memo: HashMap<u64, i64> = HashMap::new();
 
     while rot < 4 * target {
         let hash = grid_hash(&grid);
 
-        if rot % 4 == 0 && memo.contains_key(&hash) {
-            let previous_rotation = memo.get(&hash).unwrap();
+        if let Some(&previous_rotation) = memo.get(&hash) {
             let rotation_gap = rot - previous_rotation;
             let cycles = rotation_gap / 4;
 
@@ -48,39 +48,45 @@ fn solve_pt2(start_grid: &Vec<String>, target: i64) -> i32 {
     simple_weight(&grid)
 }
 
-fn transpose(vec: &Vec<String>) -> Vec<String> {
+fn transpose(vec: &[String]) -> Vec<String> {
     (0..vec[0].len())
-        .map(|i| vec.iter().map(|row| row.chars().nth(i).unwrap()).collect())
+        .map(|i| vec.iter().map(|row| row.as_bytes()[i] as char).collect())
         .collect()
 }
 
-fn grid_hash(grid: &Vec<String>) -> u64 {
+fn grid_hash(grid: &[String]) -> u64 {
     let mut hasher = DefaultHasher::new();
     grid.hash(&mut hasher);
     hasher.finish()
 }
 
-fn tilt_grid(grid: &Vec<String>) -> (i32, Vec<String>) {
+fn tilt_grid(grid: &[String]) -> (i32, Vec<String>) {
     let grid_length = grid.len() as i32;
     let mut weight = 0;
 
     let tilted: Vec<String> = grid
         .iter()
-        .map(|el| {
-            let mut consecutive_rocks = 0;
-            let mut last_block = 0;
+        .map(|row| {
             let mut new_state = vec!['.'; grid_length as usize];
-            for (chidx, ch) in el.char_indices() {
-                if ch == '#' {
-                    new_state[chidx] = '#';
-                    last_block = chidx as i32 + 1;
-                    consecutive_rocks = 0;
-                } else if ch == 'O' {
-                    new_state[(last_block + consecutive_rocks) as usize] = 'O';
-                    consecutive_rocks += 1;
-                    weight += (grid_length + 1) - last_block - consecutive_rocks;
+            let mut last_block = 0;
+            let mut consecutive_rocks = 0;
+
+            for (chidx, &ch) in row.as_bytes().iter().enumerate() {
+                match ch as char {
+                    '#' => {
+                        new_state[chidx] = '#';
+                        last_block = chidx as i32 + 1;
+                        consecutive_rocks = 0;
+                    }
+                    'O' => {
+                        new_state[(last_block + consecutive_rocks) as usize] = 'O';
+                        consecutive_rocks += 1;
+                        weight += (grid_length + 1) - last_block - consecutive_rocks;
+                    }
+                    _ => {}
                 }
             }
+
             new_state.into_iter().collect()
         })
         .collect();
@@ -88,23 +94,23 @@ fn tilt_grid(grid: &Vec<String>) -> (i32, Vec<String>) {
     (weight, tilted)
 }
 
-fn simple_weight(grid: &Vec<String>) -> i32 {
+fn simple_weight(grid: &[String]) -> i32 {
     let mut weight = 0;
-    for (idx, r) in transpose(&grid).iter().enumerate() {
-        let s = r.as_bytes().iter().filter(|&s| s == &b'O').count() as i32;
+    for (idx, row) in transpose(grid).iter().enumerate() {
+        let s = row.bytes().filter(|&s| s == b'O').count() as i32;
         weight += s * (grid.len() - idx) as i32;
     }
     weight
 }
 
-fn rotate_grid(grid: &Vec<String>) -> Vec<String> {
+fn rotate_grid(grid: &[String]) -> Vec<String> {
     let rows = grid.len();
     let cols = grid[0].len();
     let mut rotated_grid = vec![String::with_capacity(rows); cols];
 
     for i in (0..cols).rev() {
         for row in grid {
-            rotated_grid[cols - 1 - i].push(row.chars().nth(i).unwrap());
+            rotated_grid[cols - 1 - i].push(row.as_bytes()[i] as char);
         }
     }
 
