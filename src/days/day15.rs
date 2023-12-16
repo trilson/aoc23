@@ -7,7 +7,7 @@ pub fn solve() -> SolutionPair {
     let line = &lines_from_file("input/day15.txt")[0];
     let sol1 = solve_pt1(&line);
     let sol2 = solve_pt2(&line);
-    
+
     (Solution::from(sol1), Solution::from(sol2))
 }
 
@@ -26,13 +26,13 @@ fn solve_pt2(line: &String) -> u32 {
                     bx.remove(lens_label);
                 }
             }
-            digit => {                
+            digit => {
                 let lens_label = &step[0..step.len() - 2];
                 let box_match = hash(lens_label);
 
                 let focal_length = digit.to_digit(10).unwrap();
                 if let Some(bx) = boxes.get_mut(box_match as usize) {
-                    *bx.entry(lens_label.to_owned()).or_insert(0) = focal_length; 
+                    *bx.entry(lens_label.to_owned()).or_insert(0) = focal_length;
                 }
             }
         }
@@ -51,5 +51,8 @@ fn solve_pt2(line: &String) -> u32 {
 }
 
 fn hash(input: &str) -> i32 {
-    input.as_bytes().iter().fold(0_i32, |acc, &ch| (acc + ch as i32) * 17 % 256)
+    input
+        .as_bytes()
+        .iter()
+        .fold(0_i32, |acc, &ch| (acc + ch as i32) * 17 % 256)
 }
