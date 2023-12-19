@@ -1,4 +1,7 @@
-use std::collections::HashMap;
+use std::{
+    cmp::{max, min},
+    collections::HashMap,
+};
 
 use crate::{utils::files::lines_from_file, Solution, SolutionPair};
 
@@ -35,12 +38,6 @@ impl From<&str> for Part {
     }
 }
 
-impl Part {
-    fn sum(&self) -> i64 {
-        self.x + self.m + self.a + self.s
-    }
-}
-
 #[derive(Debug)]
 struct Rule {
     rule_result: RuleResult,
@@ -48,7 +45,7 @@ struct Rule {
 }
 
 impl Rule {
-    fn accept(&self, part: &Part) -> Option<&RuleResult> {
+    fn solve_pt1(&self, part: &Part) -> Option<&RuleResult> {
         if let Some(pred) = self.pred {
             let prop = match pred.0 {
                 'x' => part.x,
@@ -71,6 +68,48 @@ impl Rule {
             }
         } else {
             Some(&self.rule_result)
+        }
+    }
+
+    fn solve_pt2(&self, constraint: Constraint) -> (Constraint, Constraint) {
+        let mut pass_constraint = constraint.clone();
+        let mut fail_constraint = constraint.clone();
+
+        if let Some(pred) = self.pred {
+            match pred.0 {
+                'x' => apply_constraint(
+                    pred,
+                    &mut pass_constraint.min_x,
+                    &mut pass_constraint.max_x,
+                    &mut fail_constraint.min_x,
+                    &mut fail_constraint.max_x,
+                ),
+                'm' => apply_constraint(
+                    pred,
+                    &mut pass_constraint.min_m,
+                    &mut pass_constraint.max_m,
+                    &mut fail_constraint.min_m,
+                    &mut fail_constraint.max_m,
+                ),
+                'a' => apply_constraint(
+                    pred,
+                    &mut pass_constraint.min_a,
+                    &mut pass_constraint.max_a,
+                    &mut fail_constraint.min_a,
+                    &mut fail_constraint.max_a,
+                ),
+                's' => apply_constraint(
+                    pred,
+                    &mut pass_constraint.min_s,
+                    &mut pass_constraint.max_s,
+                    &mut fail_constraint.min_s,
+                    &mut fail_constraint.max_s,
+                ),
+                _ => {}
+            }
+            (pass_constraint, fail_constraint)
+        } else {
+            (pass_constraint, fail_constraint)
         }
     }
 }
@@ -107,7 +146,7 @@ impl From<&str> for Rule {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 enum RuleResult {
     Accept,
     Reject,
@@ -133,18 +172,27 @@ impl From<&str> for WorkFlow {
 }
 
 impl WorkFlow {
-    fn accept(&self, part: &Part) -> &RuleResult {
+    fn solve_pt1(&self, part: &Part) -> &RuleResult {
         for rule in &self.rules {
-            println!("Applying rule: {rule:?}");
-            if let Some(result) = rule.accept(&part) {
-                println!("Result: {result:?}");
+            if let Some(result) = rule.solve_pt1(&part) {
                 return result;
             } else {
-                println!("Rule does not pass. Skip.");
                 continue;
             }
         }
         panic!("We shouldn't get here");
+    }
+
+    fn solve_pt2(&self, constraint: Constraint) -> Vec<(RuleResult, Constraint)> {
+        let mut res = Vec::new();
+        let mut constr = constraint;
+
+        for rule in &self.rules {
+            let results = rule.solve_pt2(constr);
+            res.push((rule.rule_result.clone(), results.0));
+            constr = results.1;
+        }
+        res
     }
 }
 
@@ -162,18 +210,104 @@ impl WorkFlowRunner {
         }
     }
 
-    fn accept(&self, part: &Part) -> Option<i64> {
-        println!("Processing part: {:?}", part);
+    fn solve_pt1(&self, part: &Part) -> Option<i64> {
         let mut wf = "in";
         while let Some(workflow) = self.workflows.get(wf) {
-            println!("Entering workflow: {wf}");
-            match workflow.accept(part) {
-                RuleResult::Accept => return Some(part.sum()),
+            match workflow.solve_pt1(part) {
+                RuleResult::Accept => return Some(part.x + part.m + part.a + part.s),
                 RuleResult::Reject => return None,
                 RuleResult::Next(v) => wf = v,
             }
         }
         None
+    }
+
+    fn solve_pt2(&self) -> i64 {
+        let mut search = Vec::new();
+        search.push((RuleResult::Next("in".to_string()), Constraint::new()));
+
+        let mut perm_count = 0;
+        while let Some(current) = search.pop() {
+            if !current.1.is_valid() {
+                continue;
+            }
+            match current.0 {
+                RuleResult::Accept => {
+                    let perm = current.1.permutations();
+                    perm_count += perm;
+                    continue;
+                }
+                RuleResult::Reject => {
+                    continue;
+                }
+                RuleResult::Next(next) => {
+                    let wf = self.workflows.get(&next).expect("No workflow found");
+                    let next_states = wf.solve_pt2(current.1);
+                    next_states.iter().for_each(|ns| search.push(ns.clone()));
+                }
+            }
+        }
+        perm_count
+    }
+}
+
+fn apply_constraint(
+    pred: (char, char, i64),
+    pass_min: &mut i64,
+    pass_max: &mut i64,
+    fail_min: &mut i64,
+    fail_max: &mut i64,
+) {
+    if pred.1 == '>' {
+        *pass_min = max(pred.2 + 1, *pass_min);
+        *fail_max = min(pred.2, *fail_max);
+    } else {
+        *pass_max = min(pred.2 - 1, *pass_max);
+        *fail_min = max(pred.2, *fail_min);
+    }
+}
+
+#[derive(Copy, Clone, Debug)]
+struct Constraint {
+    min_x: i64,
+    max_x: i64,
+
+    min_m: i64,
+    max_m: i64,
+
+    min_a: i64,
+    max_a: i64,
+
+    min_s: i64,
+    max_s: i64,
+}
+
+impl Constraint {
+    fn new() -> Self {
+        Constraint {
+            min_x: 1,
+            max_x: 4000,
+            min_m: 1,
+            max_m: 4000,
+            min_a: 1,
+            max_a: 4000,
+            min_s: 1,
+            max_s: 4000,
+        }
+    }
+
+    fn is_valid(&self) -> bool {
+        self.min_x < self.max_x
+            && self.min_m < self.max_m
+            && self.min_a < self.max_a
+            && self.min_s < self.max_s
+    }
+
+    fn permutations(&self) -> i64 {
+        (1 + self.max_x - self.min_x)
+            * (1 + self.max_m - self.min_m)
+            * (1 + self.max_a - self.min_a)
+            * (1 + self.max_s - self.min_s)
     }
 }
 
@@ -188,14 +322,8 @@ pub fn solve() -> SolutionPair {
     let wf_runner = WorkFlowRunner::new(workflows);
     let parts: Vec<Part> = split[1].iter().map(|p| Part::from(p.as_str())).collect();
 
-    let sol1: i64 = parts.iter().filter_map(|s| wf_runner.accept(s)).sum();
-    let sol2: u64 = 0;
+    let sol1: i64 = parts.iter().filter_map(|s| wf_runner.solve_pt1(s)).sum();
+    let sol2: i64 = wf_runner.solve_pt2();
 
     (Solution::from(sol1), Solution::from(sol2))
-}
-
-// fn less_than(&)
-#[test]
-fn run_me() {
-    println!("{:?}", solve());
 }
