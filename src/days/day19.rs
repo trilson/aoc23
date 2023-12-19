@@ -15,26 +15,25 @@ struct Part {
 
 impl From<&str> for Part {
     fn from(input: &str) -> Self {
-        let valid_parts = &input[1..input.len() - 1];
-        let mut pt = Part {
+        let mut part = Part {
             x: 0,
             m: 0,
             a: 0,
             s: 0,
         };
-
-        for section in valid_parts.split(",") {
-            let x: Vec<&str> = section.split("=").collect();
-            let val = x[1].parse::<i64>().expect("Not a valid value");
-            match x[0] {
-                "x" => pt.x = val,
-                "m" => pt.m = val,
-                "a" => pt.a = val,
-                "s" => pt.s = val,
+        input[1..input.len() - 1].split(',').for_each(|section| {
+            let mut parts = section.split('=');
+            let key = parts.next().unwrap();
+            let val = parts.next().unwrap().parse().expect("Invalid value");
+            match key {
+                "x" => part.x = val,
+                "m" => part.m = val,
+                "a" => part.a = val,
+                "s" => part.s = val,
                 _ => panic!("Unexpected section"),
-            };
-        }
-        pt
+            }
+        });
+        part
     }
 }
 
@@ -72,77 +71,44 @@ impl Rule {
     }
 
     fn solve_pt2(&self, constraint: Constraint) -> (Constraint, Constraint) {
-        let mut pass_constraint = constraint.clone();
-        let mut fail_constraint = constraint.clone();
+        let mut pc = constraint.clone();
+        let mut fc = constraint.clone();
 
-        if let Some(pred) = self.pred {
-            match pred.0 {
-                'x' => apply_constraint(
-                    pred,
-                    &mut pass_constraint.min_x,
-                    &mut pass_constraint.max_x,
-                    &mut fail_constraint.min_x,
-                    &mut fail_constraint.max_x,
-                ),
-                'm' => apply_constraint(
-                    pred,
-                    &mut pass_constraint.min_m,
-                    &mut pass_constraint.max_m,
-                    &mut fail_constraint.min_m,
-                    &mut fail_constraint.max_m,
-                ),
-                'a' => apply_constraint(
-                    pred,
-                    &mut pass_constraint.min_a,
-                    &mut pass_constraint.max_a,
-                    &mut fail_constraint.min_a,
-                    &mut fail_constraint.max_a,
-                ),
-                's' => apply_constraint(
-                    pred,
-                    &mut pass_constraint.min_s,
-                    &mut pass_constraint.max_s,
-                    &mut fail_constraint.min_s,
-                    &mut fail_constraint.max_s,
-                ),
+        if let Some(p) = self.pred {
+            match p.0 {
+                'x' => apply(p, &mut pc.lx, &mut pc.mx, &mut fc.lx, &mut fc.mx),
+                'm' => apply(p, &mut pc.lm, &mut pc.mm, &mut fc.lm, &mut fc.mm),
+                'a' => apply(p, &mut pc.la, &mut pc.ma, &mut fc.la, &mut fc.ma),
+                's' => apply(p, &mut pc.ls, &mut pc.ms, &mut fc.ls, &mut fc.ms),
                 _ => {}
             }
-            (pass_constraint, fail_constraint)
+            (pc, fc)
         } else {
-            (pass_constraint, fail_constraint)
+            (pc, fc)
         }
     }
 }
 
 impl From<&str> for Rule {
     fn from(r: &str) -> Self {
-        let q_a: Vec<_> = r.split(":").collect();
-        if q_a.len() == 2 {
-            let rule_result = match q_a[1] {
-                "R" => RuleResult::Reject,
-                "A" => RuleResult::Accept,
-                next => RuleResult::Next(next.to_string()),
-            };
-            let condition = q_a[0];
-            let threshold = condition[2..condition.len()].parse::<i64>().unwrap_or(0);
-            let mut chars = condition.chars();
-            let part_type = chars.next().expect("Not a valid part type");
-            let comp_type = chars.next().expect("Not a valid comparison type");
+        let parts: Vec<_> = r.split(':').collect();
+        let rule_result = match parts.last().expect("No result found") {
+            &"R" => RuleResult::Reject,
+            &"A" => RuleResult::Accept,
+            next => RuleResult::Next(next.to_string()),
+        };
 
-            Rule {
-                rule_result,
-                pred: Some((part_type, comp_type, threshold)),
-            }
+        let pred = if parts.len() == 2 {
+            let mut chars = parts[0].chars();
+            Some((
+                chars.next().expect("Invalid part type"),
+                chars.next().expect("Invalid comparison type"),
+                parts[0][2..].parse().expect("Invalid threshold"),
+            ))
         } else {
-            Rule {
-                rule_result: match q_a[0] {
-                    "R" => RuleResult::Reject,
-                    "A" => RuleResult::Accept,
-                    other => RuleResult::Next(other.to_string()),
-                },
-                pred: None,
-            }
-        }
+            None
+        };
+        Rule { rule_result, pred }
     }
 }
 
@@ -160,14 +126,15 @@ struct WorkFlow {
 
 impl From<&str> for WorkFlow {
     fn from(r: &str) -> Self {
-        let parts: Vec<_> = r.split("{").collect();
-        let mut rule_str = parts[1].to_string();
-        rule_str.pop();
+        let parts: Vec<_> = r.split('{').collect();
+        let name = parts[0].to_string();
+        let rules = parts[1]
+            .trim_end_matches('}')
+            .split(',')
+            .map(Rule::from)
+            .collect();
 
-        WorkFlow {
-            name: parts[0].to_string(),
-            rules: rule_str.split(",").map(|r| Rule::from(r)).collect(),
-        }
+        WorkFlow { name, rules }
     }
 }
 
@@ -228,22 +195,20 @@ impl WorkFlowRunner {
 
         let mut perm_count = 0;
         while let Some(current) = search.pop() {
-            if !current.1.is_valid() {
-                continue;
-            }
             match current.0 {
                 RuleResult::Accept => {
-                    let perm = current.1.permutations();
-                    perm_count += perm;
-                    continue;
+                    perm_count += current.1.permutations();
+                }
+                RuleResult::Next(next) => {
+                    self.workflows
+                        .get(&next)
+                        .expect("No workflow found")
+                        .solve_pt2(current.1)
+                        .iter()
+                        .for_each(|ns| search.push(ns.clone()));
                 }
                 RuleResult::Reject => {
                     continue;
-                }
-                RuleResult::Next(next) => {
-                    let wf = self.workflows.get(&next).expect("No workflow found");
-                    let next_states = wf.solve_pt2(current.1);
-                    next_states.iter().for_each(|ns| search.push(ns.clone()));
                 }
             }
         }
@@ -251,7 +216,7 @@ impl WorkFlowRunner {
     }
 }
 
-fn apply_constraint(
+fn apply(
     pred: (char, char, i64),
     pass_min: &mut i64,
     pass_max: &mut i64,
@@ -269,45 +234,38 @@ fn apply_constraint(
 
 #[derive(Copy, Clone, Debug)]
 struct Constraint {
-    min_x: i64,
-    max_x: i64,
+    lx: i64,
+    mx: i64,
 
-    min_m: i64,
-    max_m: i64,
+    lm: i64,
+    mm: i64,
 
-    min_a: i64,
-    max_a: i64,
+    la: i64,
+    ma: i64,
 
-    min_s: i64,
-    max_s: i64,
+    ls: i64,
+    ms: i64,
 }
 
 impl Constraint {
     fn new() -> Self {
         Constraint {
-            min_x: 1,
-            max_x: 4000,
-            min_m: 1,
-            max_m: 4000,
-            min_a: 1,
-            max_a: 4000,
-            min_s: 1,
-            max_s: 4000,
+            lx: 1,
+            mx: 4000,
+            lm: 1,
+            mm: 4000,
+            la: 1,
+            ma: 4000,
+            ls: 1,
+            ms: 4000,
         }
     }
 
-    fn is_valid(&self) -> bool {
-        self.min_x < self.max_x
-            && self.min_m < self.max_m
-            && self.min_a < self.max_a
-            && self.min_s < self.max_s
-    }
-
     fn permutations(&self) -> i64 {
-        (1 + self.max_x - self.min_x)
-            * (1 + self.max_m - self.min_m)
-            * (1 + self.max_a - self.min_a)
-            * (1 + self.max_s - self.min_s)
+        (1 + self.mx - self.lx)
+            * (1 + self.mm - self.lm)
+            * (1 + self.ma - self.la)
+            * (1 + self.ms - self.ls)
     }
 }
 
