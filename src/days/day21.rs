@@ -1,115 +1,72 @@
-use std::{
-    collections::{HashSet, VecDeque},
-    ops::Add,
-};
+use std::collections::{HashMap, HashSet, VecDeque};
 
 use crate::{utils::files::lines_from_file, Solution, SolutionPair};
 
-#[derive(PartialEq, Eq, Hash)]
-struct Point {
-    row: i32,
-    col: i32,
-}
-
-impl Point {
-    fn default() -> Self {
-        Point { row: 0, col: 0 }
-    }
-}
-
-impl From<(usize, usize)> for Point {
-    fn from(t: (usize, usize)) -> Self {
-        Point {
-            row: t.0 as i32,
-            col: t.1 as i32,
-        }
-    }
-}
-
-impl From<(i32, i32)> for Point {
-    fn from(t: (i32, i32)) -> Self {
-        Point { row: t.0, col: t.1 }
-    }
-}
-
-impl Add for Point {
-    type Output = Point;
-    fn add(self, other: Point) -> Point {
-        Point {
-            row: self.row + other.row,
-            col: self.col + other.col,
-        }
-    }
-}
+const GRID_SIZE: usize = 131;
+const GRID_LENGTH: usize = GRID_SIZE * GRID_SIZE;
 
 pub fn solve() -> SolutionPair {
     let lines = lines_from_file("input/day21.txt");
-    let mut position: Point = Point::default();
-    let mut grid: Vec<Vec<char>> = Vec::new();
+    let grid_str: String = lines.iter().flat_map(|row| row.chars()).collect();
+    let grid_chars: Vec<char> = grid_str.chars().collect();
+    let grid_char_arr: [char; GRID_LENGTH] = grid_chars.try_into().expect("Help, array fail");
+    let start = grid_char_arr
+        .iter()
+        .position(|s| s == &'S')
+        .expect("Must have a starting point") as i32;
 
-    for (id_row, line) in lines.iter().enumerate() {
-        let mut l_chars = Vec::new();
-        for (id_col, ch) in line.char_indices() {
-            if ch == 'S' {
-                position = (id_row, id_col).into();
-            }
-            l_chars.push(ch);
-        }
-        grid.push(l_chars);
-    }
+    let res1 = solve_iterative(&grid_char_arr, start, 64);
 
-    let target = 64;
-    let mut visited = HashSet::new();
-    let mut state_queue = VecDeque::new();
-    let point_offsets: [Point; 4] = [(1, 0).into(), (-1, 0).into(), (0, 1).into(), (0, -1).into()];
-    state_queue.push_back((position, 0));
-
-    while let Some(state) = state_queue.pop_front() {
-        if let Some(spot) = grid
-            .get(state.0.row as usize)
-            .and_then(|r| r.get(state.0.col as usize))
-        {
-            if spot == &'#' {
-                continue;
-            }
-            if state.1 == target {
-                visited.insert(state.0);
-                continue;
-            }
-            // Otherwise check surrounding squares
-            for offset in &point_offsets {
-                state_queue.push_back((state.0 + offset, state.1 + 1));
-            }
-        }
-    }
-
-    println!("Visited {} spots", visited.len());
+    println!("Visited {} spots", res1.len());
     let sol1: u64 = 0;
     let sol2: u64 = 0;
 
     (Solution::from(sol1), Solution::from(sol2))
 }
 
-const OFFSETS: [Point; 4] = [(1, 0).into(), (-1, 0).into(), (0, 1).into(), (0, -1).into()];
+const OFFSETS: [(i32, i32); 4] = [(1, 0), (-1, 0), (0, 1), (0, -1)];
 
-fn solve_recursive(grid: &Vec<Vec<char>>, point: Point, steps: i32) -> HashSet<Point> {
-    if let Some(spot) = grid
-        .get(point.row as usize)
-        .and_then(|r| r.get(point.col as usize))
-    {
-        if spot == &'#' {
-            return HashSet::default();
+fn solve_iterative(
+    grid: &[char],
+    start_point: i32,
+    steps: i32,
+) -> HashSet<i32> {
+    let mut memo = HashMap::new(); // Memoization for overlapping subproblems
+    let mut queue = VecDeque::new(); // Queue for iterative exploration
+    queue.push_back((start_point, steps));
+
+    let mut reachable_points = HashSet::new();
+
+    // Can we simplify. For each spot in our flood, set to visited
+    while let Some((point, remaining_steps)) = queue.pop_front() {
+        if remaining_steps < 0 {
+            continue;
         }
-        if steps == 0 {
-            return HashSet::from([point]);
+        if point > grid.len() as i32 {
+            continue;
         }
-        let mut points = HashSet::default();
-        for offset in OFFSETS {
-            let res = solve_recursive(&grid, offset + point, steps - 1);
+        if grid[point as usize] == '#' {
+            continue;
         }
+        let memo_key = (point, remaining_steps);
+        if let Some(existing) = memo.get(&memo_key) {
+            reachable_points.extend(existing);
+            continue;
+        }
+        if remaining_steps == 0 {
+            reachable_points.insert(point);
+        } else {
+            for offset in &OFFSETS {
+                let next_spot = point + (offset.0 * grid_rows) + offset.1;
+                queue.push_back((next_spot, remaining_steps - 1));
+            }
+        }
+        memo.insert(memo_key, reachable_points.clone()); // Memoize results
     }
-    return HashSet::default();
+
+    reachable_points
 }
+
 #[test]
 fn run_me() {
     let r = solve();
