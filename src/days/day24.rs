@@ -68,7 +68,7 @@ pub fn solve() -> SolutionPair {
     (Solution::from(sol1), Solution::from(sol2))
 }
 
-fn solve_pt2(hail_stones: &[HailStone]) -> i64 {    
+fn solve_pt2(hail_stones: &[HailStone]) -> i64 {
     println!(
         "(declare-const K_x Int)
     (declare-const K_y Int)
@@ -155,9 +155,4 @@ fn collides(stone: &HailStone, other_stone: &HailStone, from: f64, to: f64) -> b
         return false;
     }
     true
-}
-
-#[test]
-fn run_me() {
-    println!("{:?}", solve());
 }
